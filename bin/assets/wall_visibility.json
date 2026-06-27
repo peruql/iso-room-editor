@@ -1,0 +1,8 @@
+{
+  "assetSwaps": {
+    "wall": "wallhide"
+  },
+  "nearDistance": 2,
+  "farDistance": 8,
+  "minAlpha": 0.28
+}

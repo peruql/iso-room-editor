@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Iso Room Editor</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #11161b; color: #e6e6e6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    #stage    { position: fixed; inset: 0; }
+    #ruffle   { width: 100%; height: 100%; }
+    #status   { position: fixed; left: 12px; bottom: 12px; padding: 8px 12px; background: rgba(0,0,0,0.55); border-radius: 6px; font-size: 13px; pointer-events: none; }
+    #status a { color: #6cf; }
+    .error    { color: #ff6b6b; }
+  </style>
+</head>
+<body>
+  <div id="stage"><div id="ruffle"></div></div>
+  <div id="status">Loading Ruffle…</div>
+
+  <!--
+    Ruffle (Flash Player emulator, Rust + WebAssembly).
+    Self-hosted: drop the matching ruffle.js + ruffle.wasm into web/ruffle/
+    from https://github.com/ruffle-rs/ruffle/releases (the "selfhosted" zip).
+    The CDN fallback below works for quick tests but rate-limits in production.
+  -->
+  <script src="ruffle/ruffle.js"
+          onerror="this.onerror=null; this.src='https://unpkg.com/@ruffle-rs/ruffle';"></script>
+
+  <script>
+    const status = document.getElementById("status");
+    const setStatus = (msg, isError) => {
+      status.textContent = msg;
+      status.classList.toggle("error", !!isError);
+    };
+
+    window.addEventListener("load", async () => {
+      if (typeof window.RufflePlayer === "undefined") {
+        setStatus("Ruffle failed to load. Check web/ruffle/ruffle.js or your internet.", true);
+        return;
+      }
+
+      const ruffle = window.RufflePlayer.newest();
+      const player = ruffle.createPlayer();
+      player.id = "ruffle-player";
+      player.style.width = "100%";
+      player.style.height = "100%";
+      document.getElementById("ruffle").appendChild(player);
+
+      try {
+        await player.load({
+          // Public deployment layout — index.html sits at site root, SWF in bin/,
+          // assets in bin/assets/ and fods/. Paths are page-relative so this
+          // works whether the site is served from "/" (custom domain) or from
+          // a subpath like "/iso-room-editor/" (default GitHub Pages URL).
+          url: "bin/NewProject.swf",
+          // Resolve SWF-internal relative URLs ("assets/wall.png",
+          // "manifest.json", "../fods/...") against the bin/ directory. The
+          // trailing slash matters — Ruffle treats this as a directory base.
+          base: "bin/",
+          // The compiled SWF was an AIR app; tell Ruffle to emulate Flash Player so
+          // any leftover AIR-only APIs degrade gracefully instead of throwing.
+          allowScriptAccess: true,
+          autoplay: "on",
+          unmuteOverlay: "hidden",
+          backgroundColor: "#11161b",
+          letterbox: "on",
+          warnOnUnsupportedContent: false,
+          // Suppress Ruffle's built-in right-click menu (quality, About, etc.)
+          // so the SWF can use right-drag for map panning without interference.
+          // With this set to "off", right-click events pass through as
+          // MouseEvent.RIGHT_MOUSE_DOWN (requires the SWF to target FP 11.2+).
+          contextMenu: "off",
+          // Standard Flash Player; AIR-specific calls (flash.filesystem.*) will no-op.
+          playerVersion: 32,
+        });
+        setStatus("Loaded. (Save/Load buttons may trigger browser downloads.)");
+        setTimeout(() => status.style.display = "none", 4000);
+      } catch (err) {
+        console.error(err);
+        setStatus("Failed to load NewProject.swf: " + err.message, true);
+      }
+    });
+  </script>
+</body>
+</html>

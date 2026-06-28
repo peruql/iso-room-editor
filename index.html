@@ -33,9 +33,64 @@
       status.classList.toggle("error", !!isError);
     };
 
+    // Right-click pan bridge.
+    // The SWF targets Flash Player 11.1 (Ruffle's AVM2 verifier rejects newer
+    // targets), so MouseEvent.RIGHT_MOUSE_DOWN never reaches the SWF. The AS3
+    // input handler already supports Space+drag for panning; this bridge maps
+    // right-click-drag onto Space+left-drag by dispatching synthetic events to
+    // the Ruffle player element. Keeps the AS3 source/normal AIR build untouched.
+    function installRightClickPanBridge(player) {
+      let active = false;
+      let lastEvt = null;
+
+      const makeMouse = (type, src, buttons) => new MouseEvent(type, {
+        bubbles: true, cancelable: true, composed: true, view: window,
+        button: 0, buttons: buttons,
+        clientX: src.clientX, clientY: src.clientY,
+        screenX: src.screenX, screenY: src.screenY,
+      });
+      const makeKey = (type) => new KeyboardEvent(type, {
+        bubbles: true, cancelable: true, composed: true,
+        key: " ", code: "Space", keyCode: 32, which: 32,
+      });
+
+      // Suppress the browser context menu over the player.
+      player.addEventListener("contextmenu", (e) => e.preventDefault(), true);
+
+      // Start panning on right-mouse-down.
+      player.addEventListener("mousedown", (e) => {
+        if (e.button !== 2 || active) return;
+        e.preventDefault();
+        e.stopPropagation();
+        active = true;
+        lastEvt = e;
+        player.dispatchEvent(makeKey("keydown"));
+        player.dispatchEvent(makeMouse("mousedown", e, 1));
+      }, true);
+
+      // Forward movement while panning. Listen on window so dragging past the
+      // player edge still updates the camera until the user releases.
+      window.addEventListener("mousemove", (e) => {
+        if (!active) return;
+        lastEvt = e;
+        player.dispatchEvent(makeMouse("mousemove", e, 1));
+      }, true);
+
+      const stop = (e) => {
+        if (!active) return;
+        if (e && e.type === "mouseup" && e.button !== 2) return;
+        active = false;
+        const src = e && e.clientX != null ? e : lastEvt;
+        if (src) player.dispatchEvent(makeMouse("mouseup", src, 0));
+        player.dispatchEvent(makeKey("keyup"));
+      };
+      window.addEventListener("mouseup", stop, true);
+      window.addEventListener("blur", stop, true);
+    }
+
     window.addEventListener("load", async () => {
       if (typeof window.RufflePlayer === "undefined") {
-        setStatus("Ruffle failed to load. Check web/ruffle/ruffle.js or your internet.", true);
+        setStatus("Ruffle failed to load. Check web/ruffle.js or your internet.", true);
         return;
       }
 
@@ -48,15 +103,18 @@
 
       try {
         await player.load({
-          // Public deployment layout — index.html sits at site root, SWF in bin/,
-          // assets in bin/assets/ and fods/. Paths are page-relative so this
-          // works whether the site is served from "/" (custom domain) or from
-          // a subpath like "/iso-room-editor/" (default GitHub Pages URL).
-          url: "bin/NewProject.swf?v=2",
-          // Resolve SWF-internal relative URLs ("assets/wall.png",
-          // "manifest.json", "../fods/...") against the bin/ directory. The
-          // trailing slash matters — Ruffle treats this as a directory base.
-          base: "bin/",
+          // Project layout: SWF lives in /bin, fods/ lives at the root. The
+          // static server document root is the project root, so we reference
+          // the SWF by /bin/NewProject.swf. URL paths inside the SWF (manifest,
+          // assets) are kept SWF-relative so FlashDevelop's local player also
+          // works; the `base` option below tells Ruffle to resolve them against
+          // /bin/ instead of the host page URL.
+          url: "/bin/NewProject.swf",
+          // Resolve relative URLoader paths inside the SWF against /bin/ so
+          // "assets/wall.png" → "/bin/assets/wall.png" and "manifest.json" →
+          // "/bin/manifest.json" and "../fods/..." → "/fods/...". Without this
+          // Ruffle would resolve against /web/ (the host page) and 404.
+          base: "/bin/",
           // The compiled SWF was an AIR app; tell Ruffle to emulate Flash Player so
           // any leftover AIR-only APIs degrade gracefully instead of throwing.
           allowScriptAccess: true,
@@ -65,16 +123,17 @@
           backgroundColor: "#11161b",
           letterbox: "on",
           warnOnUnsupportedContent: false,
-          // Suppress Ruffle's built-in right-click menu (quality, About, etc.)
-          // so the SWF can use right-drag for map panning without interference.
-          // With this set to "off", right-click events pass through as
-          // MouseEvent.RIGHT_MOUSE_DOWN (requires the SWF to target FP 11.2+).
+          // Suppress Ruffle's built-in right-click menu (quality, About, etc.).
+          // The right-click-pan bridge above synthesizes Space+drag from the
+          // right-button event so panning works even though the SWF (FP 11.1)
+          // can't receive RIGHT_MOUSE_DOWN natively.
           contextMenu: "off",
           // Standard Flash Player; AIR-specific calls (flash.filesystem.*) will no-op.
           playerVersion: 32,
         });
         setStatus("Loaded. (Save/Load buttons may trigger browser downloads.)");
         setTimeout(() => status.style.display = "none", 4000);
+        installRightClickPanBridge(player);
       } catch (err) {
         console.error(err);
         setStatus("Failed to load NewProject.swf: " + err.message, true);

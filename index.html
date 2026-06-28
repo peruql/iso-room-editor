@@ -37,55 +37,94 @@
     // The SWF targets Flash Player 11.1 (Ruffle's AVM2 verifier rejects newer
     // targets), so MouseEvent.RIGHT_MOUSE_DOWN never reaches the SWF. The AS3
     // input handler already supports Space+drag for panning; this bridge maps
-    // right-click-drag onto Space+left-drag by dispatching synthetic events to
-    // the Ruffle player element. Keeps the AS3 source/normal AIR build untouched.
+    // right-click-drag onto Space+left-drag by dispatching synthetic events
+    // straight at Ruffle's internal canvas (mouse events) and window
+    // (keyboard events). Keeps the AS3 source/normal AIR build untouched.
     function installRightClickPanBridge(player) {
-      let active = false;
-      let lastEvt = null;
-
-      const makeMouse = (type, src, buttons) => new MouseEvent(type, {
-        bubbles: true, cancelable: true, composed: true, view: window,
-        button: 0, buttons: buttons,
-        clientX: src.clientX, clientY: src.clientY,
-        screenX: src.screenX, screenY: src.screenY,
-      });
-      const makeKey = (type) => new KeyboardEvent(type, {
-        bubbles: true, cancelable: true, composed: true,
-        key: " ", code: "Space", keyCode: 32, which: 32,
-      });
-
-      // Suppress the browser context menu over the player.
-      player.addEventListener("contextmenu", (e) => e.preventDefault(), true);
-
-      // Start panning on right-mouse-down.
-      player.addEventListener("mousedown", (e) => {
-        if (e.button !== 2 || active) return;
-        e.preventDefault();
-        e.stopPropagation();
-        active = true;
-        lastEvt = e;
-        player.dispatchEvent(makeKey("keydown"));
-        player.dispatchEvent(makeMouse("mousedown", e, 1));
-      }, true);
-
-      // Forward movement while panning. Listen on window so dragging past the
-      // player edge still updates the camera until the user releases.
-      window.addEventListener("mousemove", (e) => {
-        if (!active) return;
-        lastEvt = e;
-        player.dispatchEvent(makeMouse("mousemove", e, 1));
-      }, true);
-
-      const stop = (e) => {
-        if (!active) return;
-        if (e && e.type === "mouseup" && e.button !== 2) return;
-        active = false;
-        const src = e && e.clientX != null ? e : lastEvt;
-        if (src) player.dispatchEvent(makeMouse("mouseup", src, 0));
-        player.dispatchEvent(makeKey("keyup"));
+      // Ruffle's mouse listeners live on the <canvas> inside the player's
+      // shadow root, NOT on the player wraper element. Dispatching to the
+      // wrapper never reaches AVM2. Find the canvas; retry briefly if the
+      // player hasn't built its shadow DOM yet.
+      const findCanvas = () => {
+        const root = player.shadowRoot;
+        if (!root) return null;
+        return root.querySelector("canvas") ||
+               root.querySelector("#player") ||
+               root.querySelector("[id^='ruffle']");
       };
-      window.addEventListener("mouseup", stop, true);
-      window.addEventListener("blur", stop, true);
+
+      let canvas = findCanvas();
+      if (!canvas) {
+        let tries = 0;
+        const iv = setInterval(() => {
+          canvas = findCanvas();
+          if (canvas || ++tries > 40) {
+            clearInterval(iv);
+            if (canvas) attach(canvas);
+          }
+        }, 50);
+      } else {
+        attach(canvas);
+      }
+
+      function attach(target) {
+        let active = false;
+        let lastEvt = null;
+
+        const makeMouse = (type, src, buttons) => new MouseEvent(type, {
+          bubbles: true, cancelable: true, composed: true, view: window,
+          button: 0, buttons: buttons,
+          clientX: src.clientX, clientY: src.clientY,
+          screenX: src.screenX, screenY: src.screenY,
+        });
+        const makeKey = (type) => new KeyboardEvent(type, {
+          bubbles: true, cancelable: true, composed: true, view: window,
+          key: " ", code: "Space", keyCode: 32, which: 32,
+        });
+
+        // Suppress browser context menu over the player AND the canvas.
+        const killCtx = (e) => e.preventDefault();
+        player.addEventListener("contextmenu", killCtx, true);
+        target.addEventListener("contextmenu", killCtx, true);
+
+        // Start panning on right-mouse-down. Listen on the player wrapper
+        // (which receives the native event) and forward synthetic Space+
+        // left-drag to the canvas / window.
+        const startPan = (e) => {
+          if (e.button !== 2 || active) return;
+          e.preventDefault();
+          e.stopPropagation();
+          active = true;
+          lastEvt = e;
+          // Press Space first so the AS3 handler sees spaceDown=true when
+          // it processes the mousedown.
+          window.dispatchEvent(makeKey("keydown"));
+          document.dispatchEvent(makeKey("keydown"));
+          target.dispatchEvent(makeMouse("mousedown", e, 1));
+        };
+        player.addEventListener("mousedown", startPan, true);
+        target.addEventListener("mousedown", startPan, true);
+
+        // Forward movement while panning. Listen on window so dragging past
+        // the canvas edge still updates the camera until release.
+        window.addEventListener("mousemove", (e) => {
+          if (!active) return;
+          lastEvt = e;
+          target.dispatchEvent(makeMouse("mousemove", e, 1));
+        }, true);
+
+        const stop = (e) => {
+          if (!active) return;
+          if (e && e.type === "mouseup" && e.button !== 2) return;
+          active = false;
+          const src = e && e.clientX != null ? e : lastEvt;
+          if (src) target.dispatchEvent(makeMouse("mouseup", src, 0));
+          window.dispatchEvent(makeKey("keyup"));
+          document.dispatchEvent(makeKey("keyup"));
+        };
+        window.addEventListener("mouseup", stop, true);
+        window.addEventListener("blur", stop, true);
+      }
     }
 
     window.addEventListener("load", async () => {
@@ -109,7 +148,7 @@
           // assets) are kept SWF-relative so FlashDevelop's local player also
           // works; the `base` option below tells Ruffle to resolve them against
           // /bin/ instead of the host page URL.
-          url: "bin/NewProject.swf?v=4",
+          url: "bin/NewProject.swf?v=5",
           // Resolve relative URLoader paths inside the SWF against /bin/ so
           // "assets/wall.png" → "/bin/assets/wall.png" and "manifest.json" →
           // "/bin/manifest.json" and "../fods/..." → "/fods/...". Without this

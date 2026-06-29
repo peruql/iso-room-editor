@@ -11,10 +11,13 @@
     #status   { position: fixed; left: 12px; bottom: 12px; padding: 8px 12px; background: rgba(0,0,0,0.55); border-radius: 6px; font-size: 13px; pointer-events: none; }
     #status a { color: #6cf; }
     .error    { color: #ff6b6b; }
+    #download { position: fixed; right: 12px; top: 12px; padding: 8px 14px; background: rgba(0,0,0,0.55); border-radius: 6px; font-size: 13px; color: #e6e6e6; text-decoration: none; }
+    #download:hover { background: rgba(0,0,0,0.8); color: #6cf; }
   </style>
 </head>
 <body>
   <div id="stage"><div id="ruffle"></div></div>
+  <a id="download" href="https://github.com/peruql/iso-room-editor/releases/latest/download/dead-maze-editor-local.zip" title="Download standalone Flash build (~29 MB) — runs locally in flashplayer.exe or ruffle.exe">↓ Local build (Flash/Ruffle desktop)</a>
   <div id="status">Loading Ruffle…</div>
 
   <!--

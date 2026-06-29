@@ -15,11 +15,13 @@
     #download:hover { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(255, 122, 89, 0.5); }
     #download small { display: block; font-size: 11px; font-weight: 500; opacity: 0.78; margin-top: 2px; letter-spacing: 0; }
     #download.hidden { opacity: 0; pointer-events: none; }
+    #download #dl-mirror { color: inherit; text-decoration: underline; pointer-events: auto; }
+    #download #dl-mirror:hover { opacity: 0.8; }
   </style>
 </head>
 <body>
   <div id="stage"><div id="ruffle"></div></div>
-  <a id="download" href="https://github.com/peruql/iso-room-editor/releases/latest/download/dead-maze-editor-local.zip" title="Standalone Flash build — runs locally in flashplayer.exe / ruffle.exe. ~29 MB one-time download.">↓ LOCAL MAP EDITOR (10× FASTER)<small>Flash / Ruffle Desktop · 29 MB</small></a>
+  <a id="download" href="https://files.catbox.moe/84dsc7.zip" title="Standalone Flash build (v21) — runs locally in flashplayer.exe / ruffle.exe. 29 MB. Fast mirror.">↓ LOCAL MAP EDITOR (10× FASTER)<small>Flash / Ruffle Desktop · 29 MB · <a id="dl-mirror" href="https://github.com/peruql/iso-room-editor/releases/latest/download/dead-maze-editor-local.zip">github mirror</a></small></a>
   <div id="status">Loading Ruffle…</div>
 
   <!--

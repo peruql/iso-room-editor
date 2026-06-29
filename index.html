@@ -11,13 +11,14 @@
     #status   { position: fixed; left: 12px; bottom: 12px; padding: 8px 12px; background: rgba(0,0,0,0.55); border-radius: 6px; font-size: 13px; pointer-events: none; }
     #status a { color: #6cf; }
     .error    { color: #ff6b6b; }
-    #download { position: fixed; right: 12px; top: 12px; padding: 8px 14px; background: rgba(0,0,0,0.55); border-radius: 6px; font-size: 13px; color: #e6e6e6; text-decoration: none; }
-    #download:hover { background: rgba(0,0,0,0.8); color: #6cf; }
+    #download { position: fixed; right: 16px; top: 16px; padding: 12px 18px; background: linear-gradient(135deg, #ffb347, #ff7a59); border-radius: 8px; font-size: 14px; font-weight: 700; color: #1b1f23; text-decoration: none; box-shadow: 0 6px 20px rgba(255, 122, 89, 0.35); letter-spacing: 0.3px; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+    #download:hover { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(255, 122, 89, 0.5); }
+    #download small { display: block; font-size: 11px; font-weight: 500; opacity: 0.78; margin-top: 2px; letter-spacing: 0; }
   </style>
 </head>
 <body>
   <div id="stage"><div id="ruffle"></div></div>
-  <a id="download" href="https://github.com/peruql/iso-room-editor/releases/latest/download/dead-maze-editor-local.zip" title="Download standalone Flash build (~29 MB) — runs locally in flashplayer.exe or ruffle.exe">↓ Local build (Flash/Ruffle desktop)</a>
+  <a id="download" href="https://github.com/peruql/iso-room-editor/releases/latest/download/dead-maze-editor-local.zip" title="Standalone Flash build — runs locally in flashplayer.exe / ruffle.exe. ~29 MB one-time download.">↓ LOCAL MAP EDITOR (10× FASTER)<small>Flash / Ruffle Desktop · 29 MB</small></a>
   <div id="status">Loading Ruffle…</div>
 
   <!--
@@ -151,7 +152,7 @@
           // assets) are kept SWF-relative so FlashDevelop's local player also
           // works; the `base` option below tells Ruffle to resolve them against
           // /bin/ instead of the host page URL.
-          url: "bin/NewProject.swf?v=18",
+          url: "bin/NewProject.swf?v=19",
           // Resolve relative URLoader paths inside the SWF against /bin/ so
           // "assets/wall.png" → "/bin/assets/wall.png" and "manifest.json" →
           // "/bin/manifest.json" and "../fods/..." → "/fods/...". Without this
